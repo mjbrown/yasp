@@ -5,16 +5,16 @@
 
 #define BUFFER_SIZE     64
 
-static void(*rx_callback)(uint8_t *, uint8_t, uint16_t) = 0;
+static void(*rx_callback)(uint8_t *, uint16_t, uint16_t *) = 0;
 
 static uint8_t buffer[BUFFER_SIZE];
-static uint8_t buffer_len = 0;
+static uint16_t buffer_len = 0;
 
 static uint8_t txbuffer[BUFFER_SIZE];
-static uint8_t tx_len = 0;
+static uint16_t tx_len = 0;
 
 /* Callback returns number of bytes processed */
-void setSerialRxHandler(void(*callback)(uint8_t *, uint8_t, uint16_t *)) {
+void setSerialRxHandler(void(*callback)(uint8_t *, uint16_t, uint16_t *)) {
     rx_callback = callback;
 }
 

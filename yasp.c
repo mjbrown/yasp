@@ -3,19 +3,19 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include <i2c.h>
+#define REG_LENGTH  32
 
-#define SYNCH_BYTE  0xFF
-
-static void(*commandCallbacks)(uint8_t *)[REG_LENGTH];
+static void(*commandCallbacks)(uint8_t *, uint16_t);
 static uint8_t commands[REG_LENGTH];
 static uint8_t registeredCommands = 0;
 
-void registerYaspCommand(void(*commandCallback)(uint8_t *, uint8_t), uint8_t command) {
+void registerYaspCommand(void(*commandCallback)(uint8_t *, uint16_t), uint8_t command) {
     commands[registeredCommands] = command;
-    commandCallback[registeredCommands] = commandCallback;
+    commandCallbacks = commandCallback;
     registeredCommands += 1;
 }
+
+#define SYNCH_BYTE  0xFF
 
 /* Packet Structure */
 #define SYNCH1_POS      0
@@ -39,7 +39,7 @@ int16_t processCommand(uint8_t * buffer, uint16_t length)
         return RET_CMD_INCOMPLETE;
     if ((buffer[0] & buffer[1] & SYNCH_BYTE) != SYNCH_BYTE)
         return RET_CMD_NOSYNCH;
-    cmd_len = BigEndianArrayToUint16(buffer + LENGTH_POS);
+    cmd_len = (((uint16_t) buffer[LENGTH_POS]) << 8) + ((uint16_t)buffer[LENGTH_POS+1]);
     if (cmd_len > (length - START_CHECKSUM)) // Synch not included in command length
     {
         return RET_CMD_INCOMPLETE;
@@ -48,6 +48,7 @@ int16_t processCommand(uint8_t * buffer, uint16_t length)
     {
         checksum += buffer[i];
     }
+    //printf("Actual: %02x, Checksum: %02x\n", buffer[cmd_len + START_CHECKSUM], checksum);
     if (checksum != buffer[cmd_len + START_CHECKSUM])
     {
         return RET_CMD_CORRUPT;
@@ -55,7 +56,7 @@ int16_t processCommand(uint8_t * buffer, uint16_t length)
     for (i = 0; i < registeredCommands; i++)
     {
         if (commands[i] == buffer[COMMAND_POS]) {
-            commandCallbacks[i](buffer, cmd_len);
+            commandCallbacks(buffer + COMMAND_POS + 1, cmd_len);
             break;
         }
     }
@@ -68,7 +69,7 @@ int16_t processCommand(uint8_t * buffer, uint16_t length)
 uint8_t ack_buffer[16];
 uint16_t ack_len;
 
-void yaspRx(uint8_t * cmd_buffer, uint8_t buffer_len, uint16_t * handled)
+void yaspRx(uint8_t * cmd_buffer, uint16_t buffer_len, uint16_t * handled)
 {
     uint16_t i = 1;
     int16_t return_code = 0;
