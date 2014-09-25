@@ -3,15 +3,17 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#define REG_LENGTH  32
+#include "yasp.h"
 
-static void(*commandCallbacks)(uint8_t *, uint16_t);
-static uint8_t commands[REG_LENGTH];
+#define REGISTRY_LENGTH  32
+
+static cmdCallback commandCallbacks[REGISTRY_LENGTH];
+static uint8_t commands[REGISTRY_LENGTH];
 static uint8_t registeredCommands = 0;
 
-void registerYaspCommand(void(*commandCallback)(uint8_t *, uint16_t), uint8_t command) {
+void registerYaspCommand(void(*callback)(uint8_t *, uint16_t), uint8_t command) {
     commands[registeredCommands] = command;
-    commandCallbacks = commandCallback;
+    commandCallbacks[registeredCommands] = callback;
     registeredCommands += 1;
 }
 
@@ -56,7 +58,7 @@ int16_t processCommand(uint8_t * buffer, uint16_t length)
     for (i = 0; i < registeredCommands; i++)
     {
         if (commands[i] == buffer[COMMAND_POS]) {
-            commandCallbacks(buffer + COMMAND_POS + 1, cmd_len);
+            commandCallbacks[i](buffer + COMMAND_POS + 1, cmd_len);
             break;
         }
     }
