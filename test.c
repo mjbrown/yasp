@@ -35,7 +35,7 @@ TEST_GROUP(YASP);
 // This is run BEFORE each test
 TEST_SETUP(YASP)
 {
-	yasp_Init();
+    yasp_init();
 }
 
 // This is run AFTER each test
@@ -48,11 +48,11 @@ TEST(YASP, MockCallbacks)
 {
     uint16_t handled = 0xFFFF;
     uint8_t command_buffer[] = { 0xFF, 0xFF, 0x00, 0x04, CMD_TEST_CALLBACK, 0xAA, 0x04+ CMD_TEST_CALLBACK+0xAA};
-    registerYaspCommand((void(*)(uint8_t *, uint16_t))mock_callback, CMD_TEST_CALLBACK);
+    register_yasp_command((void (*)(uint8_t *, uint16_t)) mock_callback, CMD_TEST_CALLBACK);
     rx_callback(command_buffer, (uint32_t)(sizeof(command_buffer)), &handled);
     TEST_ASSERT_EQUAL_HEX16((sizeof(command_buffer)), handled);
 
-    registerYaspCommand((void(*)(uint8_t *, uint16_t))mock_callback2, CMD_TEST_CALLBACK2);
+    register_yasp_command((void (*)(uint8_t *, uint16_t)) mock_callback2, CMD_TEST_CALLBACK2);
     rx_callback(command_buffer, (uint32_t)(sizeof(command_buffer)), &handled);
     command_buffer[4] = CMD_TEST_CALLBACK2;
     command_buffer[6] = 0x04+ CMD_TEST_CALLBACK2+0xAA;

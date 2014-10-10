@@ -4,8 +4,8 @@ yasp
 Yet Another Serial Protocol
 
 Because all the world needs is another new protocol that is nearly the same as
-every other one.  I am sick of inventing a new one every time I start a new
-firmware project.
+every other one.  Intended to be lightweight with dependency injection so that it can be dropped
+into any firmware or software project.
 
 Building with CMake
 ====
@@ -21,8 +21,8 @@ $ sudo apt-get install cmake
 Then, to actually build the code you will need to run the following:
 
 ```
-$ git clone https://github.com/mjbrown/yasp.git
-$ cd yasp
+$ git clone https://github.com/mjbrown/yasp_c.git
+$ cd yasp_c
 $ mkdir build
 $ cd build
 $ cmake ..
