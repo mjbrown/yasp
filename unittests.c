@@ -69,7 +69,6 @@ TEST(YASP, TestOneCommandRegister)
 {
     uint16_t handled = 0xFFFF;
     uint8_t command_buffer[] = { 0xFF, 0xFF, 0x00, 0x04, CMD_TEST_CALLBACK, 0xAA, 0x04+ CMD_TEST_CALLBACK+0xAA};
-    number_of_mock_cb = 0;
     register_yasp_command((void (*)(uint8_t *, uint16_t)) mock_callback, CMD_TEST_CALLBACK);
     handled = rx_callback(command_buffer, (uint16_t)(sizeof(command_buffer)));
     TEST_ASSERT_EQUAL_HEX16((sizeof(command_buffer)), handled);
@@ -80,9 +79,6 @@ TEST(YASP, TestAnotherCommandRegister)
 {
     uint16_t handled = 0xFFFF;
     uint8_t command_buffer[] = { 0xFF, 0xFF, 0x00, 0x04, CMD_TEST_CALLBACK, 0xAA, 0x04+ CMD_TEST_CALLBACK+0xAA};
-    number_of_mock_cb = 0;
-    number_of_mock_cb2 = 0;
-
     register_yasp_command((void (*)(uint8_t *, uint16_t)) mock_callback2, CMD_TEST_CALLBACK2);
     handled = rx_callback(command_buffer, (uint16_t)(sizeof(command_buffer)));
     TEST_ASSERT_EQUAL_HEX16(1, number_of_mock_cb);
@@ -110,7 +106,6 @@ TEST(YASP, TestCorrupt)
 {
     uint16_t handled = 0xFFFF;
     uint8_t command_buffer[] = { 0xFF, 0xFF, 0x00, 0x04, CMD_TEST_CALLBACK, 0xAA, 0x11};
-    tx_buffer_len = 0;
     handled = rx_callback(command_buffer, (uint16_t)(sizeof(command_buffer)));
     TEST_ASSERT_EQUAL_HEX16(sizeof(command_buffer), handled);
     TEST_ASSERT_EQUAL_STRING("Corrupt!", last_serial_tx+5);
@@ -120,7 +115,6 @@ TEST(YASP, TestNoRegistered)
 {
     uint16_t handled = 0xFFFF;
     uint8_t command_buffer[] = { 0xFF, 0xFF, 0x00, 0x04, CMD_TEST_NOT_REGISTERED, 0xAA, 0x04+ CMD_TEST_NOT_REGISTERED+0xAA};
-    tx_buffer_len = 0;
     handled = rx_callback(command_buffer, (uint16_t)(sizeof(command_buffer)));
     TEST_ASSERT_EQUAL_HEX16(sizeof(command_buffer), handled);
     TEST_ASSERT_EQUAL_STRING("NotRegistered!", last_serial_tx+5);
@@ -131,10 +125,6 @@ TEST(YASP, TestDoubleCommand)
     uint16_t handled = 0xFFFF;
     uint8_t command_buffer[] = { 0xFF, 0xFF, 0x00, 0x04, CMD_TEST_CALLBACK, 0x33, 0x04+ CMD_TEST_CALLBACK+0x33, \
                                  0xFF, 0xFF, 0x00, 0x04, CMD_TEST_CALLBACK2, 0x44, 0x04+ CMD_TEST_CALLBACK2+0x44};
-    number_of_mock_cb = 0;
-    last_mock_cb_payload_length = 0;
-    number_of_mock_cb2 = 0;
-    last_mock_cb2_payload_length = 0;
     handled = rx_callback(command_buffer, (uint16_t)(sizeof(command_buffer)));
     TEST_ASSERT_EQUAL_HEX16(1, number_of_mock_cb);
     TEST_ASSERT_EQUAL(0x33, last_mock_cb_payload[0]);

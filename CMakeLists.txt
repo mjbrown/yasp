@@ -50,7 +50,7 @@ include_directories(
 # List files that will generate unit tests. Again, headers do not need to be
 # listed here.
 set(UT_SRC_FILES
-    test.c
+    unittests.c
 )
 
 # Add an executable with our unit test code, and link it to the YASP and Unity
