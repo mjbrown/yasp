@@ -14,4 +14,7 @@ void setSerialRxHandler(serial_rx_callback);
 // This must be implemented specifically for the target platform
 void serial_tx(uint8_t *, uint16_t);
 
+// Returns the length (in bytes) of the serial buffer
+uint16_t get_serial_buffer_size();
+
 #endif

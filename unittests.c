@@ -9,6 +9,8 @@
 #define CMD_TEST_CALLBACK2  2
 #define CMD_TEST_NOT_REGISTERED 3
 
+#define SERIAL_BUFFER_SIZE  0xFFFF
+
 /*------------------------------ Test Helpers -------------------------------*/
 static serial_rx_callback rx_callback = 0;
 
@@ -42,8 +44,14 @@ void serial_tx(uint8_t * buffer, uint16_t length) {
     tx_buffer_len += length;
 }
 
-void setSerialRxHandler(serial_rx_callback callback) {
+void setSerialRxHandler(serial_rx_callback callback)
+{
     rx_callback = callback;
+}
+
+uint16_t get_serial_buffer_size()
+{
+    return SERIAL_BUFFER_SIZE; // Max
 }
 
 // Define our main test group name
@@ -133,6 +141,16 @@ TEST(YASP, TestDoubleCommand)
     TEST_ASSERT_EQUAL_HEX16(handled, sizeof(command_buffer));
 }
 
+TEST(YASP, TestInfoCommand)
+{
+    uint16_t handled = 0xFFFF;
+    uint8_t command_buffer[] = { 0xFF, 0xFF, 0x00, 0x03, CMD_YASP_INFO, 0x03+ CMD_YASP_INFO };
+    handled = rx_callback(command_buffer, (uint16_t)(sizeof(command_buffer)));
+    TEST_ASSERT_EQUAL(REGISTRY_LENGTH, last_serial_tx[5]);
+    TEST_ASSERT_EQUAL(SERIAL_BUFFER_SIZE>>8, last_serial_tx[6]);
+    TEST_ASSERT_EQUAL(SERIAL_BUFFER_SIZE&0xFF, last_serial_tx[7]);
+}
+
 // Add all test cases to a test group
 TEST_GROUP_RUNNER(YASP)
 {
@@ -142,6 +160,7 @@ TEST_GROUP_RUNNER(YASP)
     RUN_TEST_CASE(YASP, TestCorrupt);
     RUN_TEST_CASE(YASP, TestNoRegistered);
     RUN_TEST_CASE(YASP, TestDoubleCommand);
+    RUN_TEST_CASE(YASP, TestInfoCommand);
 }
 
 // Run all test groups (only 1 for now)

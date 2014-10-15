@@ -28,9 +28,9 @@ void register_yasp_command(command_callback callback, uint8_t command) {
 #define COMMAND_POS     4
 
 /* Return Codes */
-#define RET_CMD_INCOMPLETE  -1
-#define RET_CMD_NOSYNCH     -2
-#define RET_CMD_CORRUPT     -3
+#define RET_CMD_INCOMPLETE      -1
+#define RET_CMD_NOSYNCH         -2
+#define RET_CMD_CORRUPT         -3
 #define RET_CMD_NOT_REGISTERED      -4
 
 int16_t process_yasp(uint8_t *buffer, uint16_t length)
@@ -101,51 +101,60 @@ uint16_t yasp_rx(uint8_t *cmd_buffer, uint16_t buffer_len)
 {
     int16_t return_code = 0;
     uint16_t handled = 0;
-    uint16_t recursion = 0;
-    return_code = process_yasp(cmd_buffer, buffer_len);
     //sprintf(ack_buffer, "RX(%d,%d):%02x%02x%02x%02x%02x", return_code, buffer_len, cmd_buffer[3], cmd_buffer[4], cmd_buffer[5], cmd_buffer[6], cmd_buffer[7]);
     //serial_tx(ack_buffer, 30);
-    if (return_code > 0)
+    while(1)
     {
-        handled = return_code;
-        if (handled < buffer_len)
+        return_code = process_yasp(cmd_buffer+handled, buffer_len-handled);
+        if (return_code > 0)
         {
-            recursion = yasp_rx(cmd_buffer+handled, buffer_len-handled);
-            if (recursion > 0)
+            handled += return_code;
+            if (handled < buffer_len)
             {
-                handled += recursion;
+                continue;
             }
         }
-    }
-    else if (return_code == RET_CMD_NOSYNCH)
-    {
-        sprintf(ack_buffer, "Resynch!");
-        send_yasp_ack(0xFF, ack_buffer, strlen(ack_buffer)+1);
-        while ((cmd_buffer[handled] != SYNCH_BYTE) && (handled < buffer_len))
+        else if (return_code == RET_CMD_NOSYNCH)
         {
-            handled++;
+            sprintf(ack_buffer, "Resynch!");
+            send_yasp_ack(0xFF, ack_buffer, strlen(ack_buffer)+1);
+            while ((cmd_buffer[handled] != SYNCH_BYTE) && (handled < buffer_len))
+            {
+                handled++;
+            }
         }
-    }
-    else if (return_code == RET_CMD_CORRUPT)
-    {
-        sprintf(ack_buffer, "Corrupt!");
-        send_yasp_ack(0xFF, ack_buffer, strlen(ack_buffer)+1);
-        handled = buffer_len;
-    }
-    else if (return_code == RET_CMD_NOT_REGISTERED)
-    {
-        sprintf(ack_buffer, "NotRegistered!");
-        send_yasp_ack(0xFF, ack_buffer, strlen(ack_buffer)+1);
-        handled = buffer_len;
-    }
-    else
-    {
-        handled = buffer_len;
+        else if (return_code == RET_CMD_CORRUPT)
+        {
+            sprintf(ack_buffer, "Corrupt!");
+            send_yasp_ack(0xFF, ack_buffer, strlen(ack_buffer)+1);
+            handled = buffer_len;
+        }
+        else if (return_code == RET_CMD_NOT_REGISTERED)
+        {
+            sprintf(ack_buffer, "NotRegistered!");
+            send_yasp_ack(0xFF, ack_buffer, strlen(ack_buffer)+1);
+            handled = buffer_len;
+        }
+        else if (return_code == RET_CMD_INCOMPLETE)
+        {
+            // Do nothing
+        }
+        break;
     }
     return handled;
 }
 
+void yasp_info(uint8_t * payload, uint16_t length)
+{
+    uint8_t ack[3];
+    ack[0] = REGISTRY_LENGTH;
+    ack[1] = (get_serial_buffer_size() & 0xFF00) >> 8;
+    ack[2] = get_serial_buffer_size() & 0xFF;
+    send_yasp_ack(CMD_YASP_INFO, ack, sizeof(ack));
+}
+
 void yasp_init()
 {
+    register_yasp_command(yasp_info, CMD_YASP_INFO);
     setSerialRxHandler(yasp_rx);
 }
