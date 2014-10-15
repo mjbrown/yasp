@@ -1,11 +1,13 @@
 /* Example of a serial HAL meant for PIC USB serial */
-#include <stint.h>
+#include <stdint.h>
 #include <usb/usb.h>
 #include <usb/usb_device_cdc.h>
 
+#include "../serial_HAL.h"
+
 #define BUFFER_SIZE     64
 
-static void(*rx_callback)(uint8_t *, uint16_t, uint16_t *) = 0;
+static serial_rx_callback rx_callback = NULL;
 
 static uint8_t buffer[BUFFER_SIZE];
 static uint16_t buffer_len = 0;
@@ -14,7 +16,7 @@ static uint8_t txbuffer[BUFFER_SIZE];
 static uint16_t tx_len = 0;
 
 /* Callback returns number of bytes processed */
-void setSerialRxHandler(void(*callback)(uint8_t *, uint16_t, uint16_t *)) {
+void setSerialRxHandler(serial_rx_callback callback) {
     rx_callback = callback;
 }
 
@@ -44,7 +46,12 @@ void serialService() {
     }
     if ((mUSBUSARTIsTxTrfReady() == true) && (tx_len > 0))
     {
-        putUSBUSART(txbufer, tx_len);
+        putUSBUSART(txbuffer, tx_len);
         tx_len = 0;
     }
+}
+
+uint16_t get_serial_buffer_size()
+{
+    return BUFFER_SIZE;
 }
