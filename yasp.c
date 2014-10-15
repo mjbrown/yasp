@@ -150,11 +150,11 @@ void yasp_info(uint8_t * payload, uint16_t length)
     ack[0] = REGISTRY_LENGTH;
     ack[1] = (get_serial_buffer_size() & 0xFF00) >> 8;
     ack[2] = get_serial_buffer_size() & 0xFF;
-    send_yasp_ack(0x7F, ack, sizeof(ack));
+    send_yasp_ack(CMD_YASP_INFO, ack, sizeof(ack));
 }
 
 void yasp_init()
 {
-    register_yasp_command(yasp_info, 0x7F);
+    register_yasp_command(yasp_info, CMD_YASP_INFO);
     setSerialRxHandler(yasp_rx);
 }

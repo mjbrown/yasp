@@ -4,6 +4,9 @@
 // Define the length for statically allocating pointers for command callbacks
 #define REGISTRY_LENGTH  32
 
+// Built in command for software to configure itself against the target
+#define CMD_YASP_INFO   0x7F
+
 typedef void(*command_callback)(uint8_t * payload, uint16_t payload_length);
 
 // Set the callback when a specific yasp command is received
