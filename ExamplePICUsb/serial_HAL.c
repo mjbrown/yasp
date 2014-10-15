@@ -49,6 +49,7 @@ void serialService() {
         putUSBUSART(txbuffer, tx_len);
         tx_len = 0;
     }
+    CDCTxService();
 }
 
 uint16_t get_serial_buffer_size()
