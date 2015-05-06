@@ -15,6 +15,6 @@ void register_yasp_command(command_callback callback, uint8_t command);
 // Attach yasp to the serial port
 void yasp_init();
 
-void send_yasp_ack(uint8_t cmd, uint8_t * payload, uint16_t payload_length);
+void send_yasp_command(uint8_t cmd, uint8_t * payload, uint16_t payload_length, uint8_t ack);
 
 #endif // _YASP_H_

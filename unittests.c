@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <string.h>
 #include <stdlib.h>
 
@@ -9,6 +10,7 @@
 #define CMD_TEST_CALLBACK       1
 #define CMD_TEST_CALLBACK2      2
 #define CMD_TEST_NOT_REGISTERED 3
+#define COMMAND_POS             4
 
 #define SERIAL_BUFFER_SIZE      0xFFFF
 #define CRC32_SIZE              4
@@ -30,6 +32,7 @@ static uint16_t tx_buffer_len;
 
 void mock_callback(uint8_t * payload, uint16_t length)
 {
+    printf("Mockcb!\r\n");
     number_of_mock_cb++;
     memcpy(last_mock_cb_payload, payload, length);
     last_mock_cb_payload_length += length;
@@ -37,6 +40,7 @@ void mock_callback(uint8_t * payload, uint16_t length)
 
 void mock_callback2(uint8_t * payload, uint16_t length)
 {
+    printf("Mockcb2!\r\n");
     number_of_mock_cb2++;
     memcpy(last_mock_cb2_payload, payload, length);
     last_mock_cb2_payload_length += length;
@@ -55,16 +59,6 @@ void setSerialRxHandler(serial_rx_callback callback)
 uint16_t get_serial_buffer_size()
 {
     return SERIAL_BUFFER_SIZE; // Max
-}
-
-void add_and_cat_crc(uint8_t * command, uint8_t * message, uint16_t command_size)
-{
-    int i=0;
-    uint32_t crc_32 = 0;
-    
-    memcpy(message, command, command_size);
-    crc_32 = crc32(crc_32, command+2, command_size-2);
-    crc32_serialize(crc_32, message+command_size);
 }
 
 // Define our main test group name
@@ -90,33 +84,32 @@ TEST(YASP, TestOneCommandRegister)
 {
     uint16_t handled = 0xFFFF;
     uint32_t crc_32 = 0;
-    uint8_t command_buffer[] = { 0xFF, 0xFF, 0x00, 0x04, CMD_TEST_CALLBACK, 0xAA};
-    uint8_t message_buffer[MSG_WITH_1_BYTE_PAYLOAD_SIZE];
+    uint8_t payload_buffer[] = { 0xAA, 0xBB };
 
-    add_and_cat_crc(command_buffer, message_buffer, 6);
     register_yasp_command((void (*)(uint8_t *, uint16_t)) mock_callback, CMD_TEST_CALLBACK);
-    handled = rx_callback(message_buffer, (uint16_t)(sizeof(message_buffer)));
+    send_yasp_command(CMD_TEST_CALLBACK, payload_buffer, sizeof(payload_buffer), false);
+    handled = rx_callback(last_serial_tx, tx_buffer_len);
     
-    TEST_ASSERT_EQUAL_HEX16((sizeof(message_buffer)), handled);
+    TEST_ASSERT_EQUAL_HEX16(tx_buffer_len, handled);
     TEST_ASSERT_EQUAL_HEX16(1, number_of_mock_cb);
 }
 
 TEST(YASP, TestAnotherCommandRegister)
 {
     uint16_t handled = 0xFFFF;
-    uint8_t command_buffer[] = { 0xFF, 0xFF, 0x00, 0x04, CMD_TEST_CALLBACK, 0xAA };
-    uint8_t message_buffer[MSG_WITH_1_BYTE_PAYLOAD_SIZE];
+    uint8_t payload_buffer[] = { 0xAA, 0xBB, 0xCC };
+    uint8_t payload_buffer2[] = { 0xDD, 0xEE, 0xFF };
     
-    add_and_cat_crc(command_buffer, message_buffer, 6);
-    register_yasp_command((void (*)(uint8_t *, uint16_t)) mock_callback2, CMD_TEST_CALLBACK2);
-    handled = rx_callback(message_buffer, (uint16_t)(sizeof(message_buffer)));
+    register_yasp_command((void (*)(uint8_t *, uint16_t)) mock_callback, CMD_TEST_CALLBACK);
+    send_yasp_command(CMD_TEST_CALLBACK, payload_buffer, sizeof(payload_buffer), false);
+    handled = rx_callback(last_serial_tx, tx_buffer_len);
     TEST_ASSERT_EQUAL_HEX16(1, number_of_mock_cb);
-    TEST_ASSERT_EQUAL_HEX16(sizeof(message_buffer), handled);
+    TEST_ASSERT_EQUAL_HEX16(tx_buffer_len, handled);
     
-    command_buffer[4] = CMD_TEST_CALLBACK2;
-    add_and_cat_crc(command_buffer, message_buffer, 6);
-    handled = rx_callback(message_buffer, (uint32_t)(sizeof(message_buffer)));
-    TEST_ASSERT_EQUAL_HEX16((sizeof(message_buffer)), handled);
+    register_yasp_command((void (*)(uint8_t *, uint16_t)) mock_callback2, CMD_TEST_CALLBACK2);
+    send_yasp_command(CMD_TEST_CALLBACK2, payload_buffer2, sizeof(payload_buffer2), false);
+    handled = rx_callback(last_serial_tx, tx_buffer_len);
+    TEST_ASSERT_EQUAL_HEX16(tx_buffer_len, handled);
     TEST_ASSERT_EQUAL_HEX16(number_of_mock_cb2, 1);
 }
 
@@ -124,6 +117,7 @@ TEST(YASP, TestNoSynch)
 {
     uint16_t handled = 0xFFFF;
     uint8_t command_buffer[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09 };
+    register_yasp_command((void (*)(uint8_t *, uint16_t)) mock_callback2, CMD_TEST_CALLBACK2);
     handled = rx_callback(command_buffer, (uint16_t)(sizeof(command_buffer)));
     TEST_ASSERT_EQUAL_HEX16(sizeof(command_buffer), handled);
     command_buffer[3] = 0xFF;
@@ -136,79 +130,83 @@ TEST(YASP, TestCorrupt)
 {
 
     uint16_t handled = 0xFFFF;
-    uint8_t command_buffer[] = { 0xFF, 0xFF, 0x00, 0x04, CMD_TEST_CALLBACK, 0xAA };
-    uint8_t message_buffer[MSG_WITH_1_BYTE_PAYLOAD_SIZE];
-    uint8_t * corrupt_byte_pt;
-    add_and_cat_crc(command_buffer, message_buffer, 6);
-    // Corrupt last byte of crc
-    corrupt_byte_pt = &message_buffer[sizeof(message_buffer) - 1];
-    *corrupt_byte_pt ^= 0xFF;
+    uint8_t payload_buffer[] = { 0xAA };
+    uint8_t error_string[] = "Corrupt!";
+    uint16_t error_string_idx = 0;
+    uint16_t command_size = 0;
     
     register_yasp_command((void (*)(uint8_t *, uint16_t)) mock_callback, CMD_TEST_CALLBACK);
-    handled = rx_callback(message_buffer, (uint16_t)(sizeof(message_buffer)));
-    TEST_ASSERT_EQUAL_HEX16((sizeof(message_buffer)), handled);
-    TEST_ASSERT_EQUAL_HEX16(0, number_of_mock_cb);
-    TEST_ASSERT_EQUAL_STRING("Corrupt!", last_serial_tx+5);
+    send_yasp_command(CMD_TEST_CALLBACK, payload_buffer, sizeof(payload_buffer), false);
+    handled = rx_callback(last_serial_tx, tx_buffer_len);
+    
+    send_yasp_command(CMD_TEST_CALLBACK, payload_buffer, sizeof(payload_buffer), false);
+    // Corrupt last byte of crc
+    last_serial_tx[tx_buffer_len - 1] ^= 0xFF;
+    
+    command_size = tx_buffer_len;
+    handled = rx_callback(last_serial_tx, tx_buffer_len);
+    
+    TEST_ASSERT_EQUAL_HEX16(command_size, handled);
+    /* "Corrupt!" payload */
+    error_string_idx = tx_buffer_len - sizeof(error_string) - sizeof(uint32_t);
+    TEST_ASSERT_EQUAL_STRING(error_string, &last_serial_tx[error_string_idx]);
 }
 
 TEST(YASP, TestNoRegistered)
 {
     uint16_t handled = 0xFFFF;
-    uint8_t command_buffer[] = { 0xFF, 0xFF, 0x00, 0x04, CMD_TEST_NOT_REGISTERED, 0xAA };
-    uint8_t message_buffer[MSG_WITH_1_BYTE_PAYLOAD_SIZE];
-    add_and_cat_crc(command_buffer, message_buffer, 6);
+    uint8_t payload_buffer[] = { 0xAA };
+    uint8_t error_string[] = "NotRegistered!";
+    uint16_t error_string_idx = 0;
+    uint16_t command_size = 0;
     
-    handled = rx_callback(message_buffer, (uint16_t)(sizeof(message_buffer)));
-    TEST_ASSERT_EQUAL_HEX16(sizeof(message_buffer), handled);
-    TEST_ASSERT_EQUAL_STRING("NotRegistered!", last_serial_tx+5);
+    send_yasp_command(CMD_TEST_NOT_REGISTERED, payload_buffer, tx_buffer_len, false);
+    command_size = tx_buffer_len;
+    handled = rx_callback(last_serial_tx, tx_buffer_len);
+    TEST_ASSERT_EQUAL_HEX16(command_size, handled);
+    error_string_idx = tx_buffer_len - sizeof(error_string) - sizeof(uint32_t);
+    TEST_ASSERT_EQUAL_STRING("NotRegistered!", &last_serial_tx[error_string_idx]);
 }
 
 TEST(YASP, TestDoubleCommand)
 {
     uint16_t i=0;
     uint16_t handled = 0xFFFF;
-    uint8_t command_buffer_1[] = { 0xFF, 0xFF, 0x00, 0x04, CMD_TEST_CALLBACK, 0x33  };
-    uint8_t command_buffer_2[] = { 0xFF, 0xFF, 0x00, 0x04, CMD_TEST_CALLBACK2, 0x44 };
-                                
-    uint8_t message_buffer_1[MSG_WITH_1_BYTE_PAYLOAD_SIZE];
-    uint8_t message_buffer_2[MSG_WITH_1_BYTE_PAYLOAD_SIZE];
-    uint8_t complete_message[(MSG_WITH_1_BYTE_PAYLOAD_SIZE)*2];
-    add_and_cat_crc(command_buffer_1, message_buffer_1, 6);
-    add_and_cat_crc(command_buffer_2, message_buffer_2, 6);
-    memcpy(complete_message, message_buffer_1, sizeof(message_buffer_1));
-    printf("\nmessage1: \t\t");
-    for(i= 0; i < sizeof(message_buffer_1); i++)
-    {
-        printf("%02x ", message_buffer_1[i]);
-    }
-    printf("\r\n");
-    printf("\nmessage2: \t\t");
-    for(i= 0; i < sizeof(message_buffer_2); i++)
-    {
-        printf("%02x ", message_buffer_2[i]);
-    }
-    printf("\r\n");
+    uint8_t payload_buffer_1[] = { 0x33  };
+    uint8_t payload_buffer_2[] = { 0x44 };
+    uint16_t command_size;
 
-    memcpy(&complete_message[sizeof(message_buffer_1)], message_buffer_2, sizeof(message_buffer_2));
+    register_yasp_command((void (*)(uint8_t *, uint16_t)) mock_callback, CMD_TEST_CALLBACK);
+    register_yasp_command((void (*)(uint8_t *, uint16_t)) mock_callback2, CMD_TEST_CALLBACK2);
+    send_yasp_command(CMD_TEST_CALLBACK, payload_buffer_1, sizeof(payload_buffer_1), false);
+    send_yasp_command(CMD_TEST_CALLBACK2, payload_buffer_2, sizeof(payload_buffer_2), false);
+
+    printf("\r\nTestDoubleCommand cmd:\r\n");
+    for(i= 0; i < tx_buffer_len; i++)
+    {
+        printf("%02x ", last_serial_tx[i]);
+    }
+    printf("\r\n");
     
-    handled = rx_callback(complete_message, (uint16_t)(sizeof(complete_message)));
+    command_size = tx_buffer_len;
+    handled = rx_callback(last_serial_tx, command_size);
     TEST_ASSERT_EQUAL_HEX16(1, number_of_mock_cb);
     TEST_ASSERT_EQUAL(0x33, last_mock_cb_payload[0]);
     TEST_ASSERT_EQUAL_HEX16(1, last_mock_cb_payload_length);
     TEST_ASSERT_EQUAL_HEX16(1, number_of_mock_cb2);
-    TEST_ASSERT_EQUAL_HEX16(handled, sizeof(complete_message));
+    TEST_ASSERT_EQUAL_HEX16(handled, command_size);
 }
 
 TEST(YASP, TestInfoCommand)
 {
     uint16_t handled = 0xFFFF;
-    uint8_t command_buffer[] = { 0xFF, 0xFF, 0x00, 0x03, CMD_YASP_INFO };
-    uint8_t message_buffer[5 + CRC32_SIZE];
-    add_and_cat_crc(command_buffer, message_buffer, 5);
-    handled = rx_callback(message_buffer, (uint16_t)(sizeof(message_buffer)));
-    TEST_ASSERT_EQUAL(REGISTRY_LENGTH, last_serial_tx[5]);
-    TEST_ASSERT_EQUAL(SERIAL_BUFFER_SIZE>>8, last_serial_tx[6]);
-    TEST_ASSERT_EQUAL(SERIAL_BUFFER_SIZE&0xFF, last_serial_tx[7]);
+    uint8_t registry_length_idx;
+    send_yasp_command(CMD_YASP_INFO, 0, 0, false);
+    handled = rx_callback(last_serial_tx, tx_buffer_len);
+    registry_length_idx = tx_buffer_len - sizeof(uint32_t) - 3;
+    TEST_ASSERT_EQUAL(REGISTRY_LENGTH, last_serial_tx[registry_length_idx]);
+    TEST_ASSERT_EQUAL(SERIAL_BUFFER_SIZE>>8, last_serial_tx[registry_length_idx + 1]);
+    TEST_ASSERT_EQUAL(SERIAL_BUFFER_SIZE&0xFF, last_serial_tx[registry_length_idx + 2]);
 }
 
 
