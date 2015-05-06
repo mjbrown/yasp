@@ -32,7 +32,6 @@ static uint16_t tx_buffer_len;
 
 void mock_callback(uint8_t * payload, uint16_t length)
 {
-    printf("Mockcb!\r\n");
     number_of_mock_cb++;
     memcpy(last_mock_cb_payload, payload, length);
     last_mock_cb_payload_length += length;
@@ -40,7 +39,6 @@ void mock_callback(uint8_t * payload, uint16_t length)
 
 void mock_callback2(uint8_t * payload, uint16_t length)
 {
-    printf("Mockcb2!\r\n");
     number_of_mock_cb2++;
     memcpy(last_mock_cb2_payload, payload, length);
     last_mock_cb2_payload_length += length;
@@ -181,13 +179,6 @@ TEST(YASP, TestDoubleCommand)
     send_yasp_command(CMD_TEST_CALLBACK, payload_buffer_1, sizeof(payload_buffer_1), false);
     send_yasp_command(CMD_TEST_CALLBACK2, payload_buffer_2, sizeof(payload_buffer_2), false);
 
-    printf("\r\nTestDoubleCommand cmd:\r\n");
-    for(i= 0; i < tx_buffer_len; i++)
-    {
-        printf("%02x ", last_serial_tx[i]);
-    }
-    printf("\r\n");
-    
     command_size = tx_buffer_len;
     handled = rx_callback(last_serial_tx, command_size);
     TEST_ASSERT_EQUAL_HEX16(1, number_of_mock_cb);

@@ -67,7 +67,7 @@ int16_t process_yasp(uint8_t *buffer, uint16_t length)
     crc_32_calc = crc32(crc_32_calc, &buffer[START_CRC32_POS], cmd_len );
     crc_32_received = crc32_deserialize(&buffer[START_CRC32_POS + cmd_len]);
 
-#if DEBUG_YASP
+#if defined DEBUG_YASP
     printf("\nYASP RX message: \t\t");
     for(i= 0; i < length; i++)
     {
@@ -75,7 +75,7 @@ int16_t process_yasp(uint8_t *buffer, uint16_t length)
     }
     printf("\r\n");
 
-    printf(" Calculated: %08x, Received: %08x, cmd_len: %d", 
+    printf(" Calculated: %08lx, Received: %08lx, cmd_len: %d", 
             crc_32_calc, crc_32_received, cmd_len );
 #endif 
 
@@ -89,7 +89,6 @@ int16_t process_yasp(uint8_t *buffer, uint16_t length)
     {
         if (commands[i] == buffer[COMMAND_POS]) 
         {
-            printf("Calling command callback!\r\n");
             command_callbacks[i](buffer + COMMAND_POS + 1, cmd_len-3);
             break;
         }
@@ -105,7 +104,6 @@ int16_t process_yasp(uint8_t *buffer, uint16_t length)
 
 void send_yasp_command(uint8_t cmd, uint8_t * payload, uint16_t length, uint8_t ack)
 {
-    int i;
     uint8_t out_buffer[2+2+1];
     uint32_t crc_32 = 0x00;
     uint8_t crc_buffer[sizeof(crc_32)];
@@ -113,10 +111,7 @@ void send_yasp_command(uint8_t cmd, uint8_t * payload, uint16_t length, uint8_t 
     out_buffer[SYNCH2_POS] = 0xFF;
     out_buffer[LENGTH_POS] = (uint8_t)((length + 3) >> 8);
     out_buffer[LENGTH_POS+1] = (uint8_t)(length+3);
-    if(ack)
-    {
-        out_buffer[COMMAND_POS] = 0x80 | cmd;
-    }
+    out_buffer[COMMAND_POS] = ack ? (0x80 | cmd) : cmd;
     serial_tx(out_buffer, 5);
     crc_32 = crc32(crc_32, &out_buffer[2], 3);
     if (length > 0)
@@ -150,8 +145,8 @@ uint16_t yasp_rx(uint8_t *cmd_buffer, uint16_t buffer_len)
         }
         else if (return_code == RET_CMD_NOSYNCH)
         {
-            sprintf(ack_buffer, "Resynch!");
-            send_yasp_command(0xFF, ack_buffer, strlen(ack_buffer)+1, true);
+            sprintf((char *)ack_buffer, "Resynch!");
+            send_yasp_command(0xFF, ack_buffer, strlen((const char *)ack_buffer)+1, true);
             while ((cmd_buffer[handled] != SYNCH_BYTE) && (handled < buffer_len))
             {
                 handled++;
@@ -159,14 +154,14 @@ uint16_t yasp_rx(uint8_t *cmd_buffer, uint16_t buffer_len)
         }
         else if (return_code == RET_CMD_CORRUPT)
         {
-            sprintf(ack_buffer, "Corrupt!");
-            send_yasp_command(0xFF, ack_buffer, strlen(ack_buffer)+1, true);
+            sprintf((char *)ack_buffer, "Corrupt!");
+            send_yasp_command(0xFF, ack_buffer, strlen((const char *)ack_buffer)+1, true);
             handled = buffer_len;
         }
         else if (return_code == RET_CMD_NOT_REGISTERED)
         {
-            sprintf(ack_buffer, "NotRegistered!");
-            send_yasp_command(0xFF, ack_buffer, strlen(ack_buffer)+1, true);
+            sprintf((char *)ack_buffer, "NotRegistered!");
+            send_yasp_command(0xFF, ack_buffer, strlen((const char *)ack_buffer)+1, true);
             handled = buffer_len;
         }
         else if (return_code == RET_CMD_INCOMPLETE)
@@ -180,11 +175,13 @@ uint16_t yasp_rx(uint8_t *cmd_buffer, uint16_t buffer_len)
 
 void yasp_info(uint8_t * payload, uint16_t length)
 {
-    uint8_t ack[3];
-    ack[0] = REGISTRY_LENGTH;
-    ack[1] = (get_serial_buffer_size() & 0xFF00) >> 8;
-    ack[2] = get_serial_buffer_size() & 0xFF;
-    send_yasp_command(CMD_YASP_INFO, ack, sizeof(ack), true);
+    uint8_t info[3];
+    (void) payload;
+    (void) length;
+    info[0] = REGISTRY_LENGTH;
+    info[1] = (get_serial_buffer_size() & 0xFF00) >> 8;
+    info[2] = get_serial_buffer_size() & 0xFF;
+    send_yasp_command(CMD_YASP_INFO, info, sizeof(info), true);
 }
 
 void yasp_init()
