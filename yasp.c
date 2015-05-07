@@ -22,9 +22,10 @@ void register_yasp_command(command_callback callback, uint8_t command) {
 
 #define SYNCH_BYTE              0xFF
 #define NUM_SYNCH_BYTES         2
-#define MINIMUM_PACKET_SIZE     6
-#define MINIMUM_PACKET_SIZE     6
+#define MINIMUM_PACKET_SIZE     9
 #define CRC32_SIZE              4
+#define COMMAND_SIZE            1
+#define COMMAND_LENGTH_SIZE     2
 
 /* Packet Structure */
 #define SYNCH1_POS              0
@@ -107,10 +108,11 @@ void send_yasp_command(uint8_t cmd, uint8_t * payload, uint16_t length, uint8_t 
     uint8_t out_buffer[2+2+1];
     uint32_t crc_32 = 0x00;
     uint8_t crc_buffer[sizeof(crc_32)];
+    uint16_t command_length = COMMAND_SIZE + COMMAND_LENGTH_SIZE + length; 
     out_buffer[SYNCH1_POS] = 0xFF;
     out_buffer[SYNCH2_POS] = 0xFF;
-    out_buffer[LENGTH_POS] = (uint8_t)((length + 3) >> 8);
-    out_buffer[LENGTH_POS+1] = (uint8_t)(length+3);
+    out_buffer[LENGTH_POS] = (uint8_t)(command_length >> 8);
+    out_buffer[LENGTH_POS+1] = (uint8_t)(command_length);
     out_buffer[COMMAND_POS] = ack ? (0x80 | cmd) : cmd;
     serial_tx(out_buffer, 5);
     crc_32 = crc32(crc_32, &out_buffer[2], 3);

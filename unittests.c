@@ -78,17 +78,33 @@ TEST_TEAR_DOWN(YASP)
 {
 }
 
+TEST(YASP, TestCommandLength)
+{
+    uint8_t payload_buffer[] = { 0xAA, 0xBB };
+    uint8_t command = CMD_TEST_CALLBACK;
+    uint16_t command_size_calc = 0;
+    uint16_t command_size_buff = 0;
+
+    send_yasp_command(command, payload_buffer, sizeof(payload_buffer), false);
+    command_size_calc = sizeof(command) + sizeof(command_size_calc) + sizeof(payload_buffer);
+    command_size_buff = (last_serial_tx[2] << 8) | last_serial_tx[3];
+
+    TEST_ASSERT_EQUAL_HEX16(command_size_calc, command_size_buff);
+}
+
 TEST(YASP, TestOneCommandRegister)
 {
     uint16_t handled = 0xFFFF;
     uint32_t crc_32 = 0;
     uint8_t payload_buffer[] = { 0xAA, 0xBB };
+    uint16_t bytes_sent;
 
     register_yasp_command((void (*)(uint8_t *, uint16_t)) mock_callback, CMD_TEST_CALLBACK);
     send_yasp_command(CMD_TEST_CALLBACK, payload_buffer, sizeof(payload_buffer), false);
+    bytes_sent = tx_buffer_len;
     handled = rx_callback(last_serial_tx, tx_buffer_len);
     
-    TEST_ASSERT_EQUAL_HEX16(tx_buffer_len, handled);
+    TEST_ASSERT_EQUAL_HEX16(bytes_sent, handled);
     TEST_ASSERT_EQUAL_HEX16(1, number_of_mock_cb);
 }
 
@@ -204,6 +220,7 @@ TEST(YASP, TestInfoCommand)
 // Add all test cases to a test group
 TEST_GROUP_RUNNER(YASP)
 {
+    RUN_TEST_CASE(YASP, TestCommandLength);
     RUN_TEST_CASE(YASP, TestOneCommandRegister);
     RUN_TEST_CASE(YASP, TestAnotherCommandRegister);
     RUN_TEST_CASE(YASP, TestNoSynch);
