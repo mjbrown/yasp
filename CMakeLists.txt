@@ -25,7 +25,8 @@ project(YASP C)
 # List all source files here, one per line.  Changes to header files are
 # detected automatically, so headers do not need to be added here.
 set(SRC_FILES
-    yasp.c
+   yasp.c
+   crc32/crc32.c
 )
 
 # Define directories that contain local headers.
