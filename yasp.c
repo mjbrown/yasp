@@ -43,6 +43,7 @@ void register_yasp_command(command_callback callback, uint8_t command) {
 int16_t process_yasp(uint8_t *buffer, uint16_t length)
 {
     uint16_t cmd_len;
+    uint16_t pkt_len;
     uint16_t i;
     uint32_t crc_32_calc = 0;
     uint32_t crc_32_received = 0;
@@ -58,9 +59,10 @@ int16_t process_yasp(uint8_t *buffer, uint16_t length)
     }
     
     cmd_len = (((uint16_t) buffer[LENGTH_POS]) << 8) + ((uint16_t)buffer[LENGTH_POS+1]);
-    
+    pkt_len = cmd_len + CRC32_SIZE;
+
     /* Synch bytes not included in command length */
-    if (cmd_len > (length - START_CRC32_POS)) 
+    if (pkt_len > (length - START_CRC32_POS)) 
     {
         return RET_CMD_INCOMPLETE;
     }
