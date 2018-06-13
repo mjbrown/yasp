@@ -1,0 +1,104 @@
+#include "util.h"
+#include "packetize.h"
+
+// TODO: Set a size to zero to eliminate the field
+#define SYNC_SIZE           2
+#define CHECKSUM_SIZE       2
+#define CRC_SIZE            4
+
+#define PROTOCOL_OVERHEAD   (SYNC_SIZE + sizeof(data_length_t) + sizeof(handle_t) + sizeof(command_t) + CHECKSUM_SIZE + CRC_SIZE)
+
+void packetize_data(command_t cmd, handle_t cmd_handle, uint8_t * data, data_length_t length, fifo_t * p_fifo) {
+// Customize here for synchronization bytes, checksum, byte stuffing, etc.
+    uint32_t i;
+    uint8_t header[PROTOCOL_OVERHEAD];
+    uint8_t * p_header = header;
+#if (SYNC_SIZE > 0)
+    toUintLEArray( SYNC_VALUE, p_header, SYNC_SIZE);
+    p_header += SYNC_SIZE;
+#endif
+    toUintLEArray( length, p_header, sizeof(data_length_t));
+    p_header += sizeof(data_length_t);
+    toUintLEArray( cmd_handle, p_header, sizeof(handle_t));
+    p_header += sizeof(handle_t);
+    toUintLEArray( cmd, p_header, sizeof(command_t));
+    p_header += sizeof(command_t);
+
+#if (CHECKSUM_SIZE > 0)
+    checksum_t checksum = 0;
+    for (i = SYNC_SIZE; i < PROTOCOL_OVERHEAD - CHECKSUM_SIZE; i++) {
+        checksum += header[i];
+    }
+    for (i = 0; i < length; i++) {
+        checksum += data[i];
+    }
+    toUintLEArray( checksum, p_header, CHECKSUM_SIZE);
+    p_header += CHECKSUM_SIZE;
+#endif
+
+#if (CRC_SIZE > 0)
+    crc_t crc = crc32(header, SYNC_SIZE + sizeof(data_length_t) + sizeof(command_t) + CHECKSUM_SIZE, 0);
+    toUintLEArray(crc32(data, length, crc), p_header, CRC_SIZE);
+    p_header += CRC_SIZE;
+#endif
+
+    fifo_put(p_fifo, header, PROTOCOL_OVERHEAD);
+    fifo_put(p_fifo, data, length);
+}
+
+
+bool depacketize_data(fifo_t * p_fifo) {
+    int i;
+#if (SYNC_SIZE > 0)
+    while (fifo_bytes_used(p_fifo) >= PROTOCOL_OVERHEAD) {
+        if (LEtoUint(p_fifo->data, SYNC_SIZE) != SYNC_VALUE) {
+            fifo_destroy(p_fifo, 1);
+        } else {
+            break;
+        }
+    }
+#endif
+
+    if (fifo_bytes_used(p_fifo) < PROTOCOL_OVERHEAD) {
+        return false;
+    }
+    uint8_t header[PROTOCOL_OVERHEAD];
+    fifo_peek(p_fifo, header, 0, PROTOCOL_OVERHEAD);
+    data_length_t msg_length = (data_length_t )LEtoUint(header + SYNC_SIZE, sizeof(data_length_t));
+    if (msg_length > MAX_DATA_LENGTH) {
+        fifo_destroy(p_fifo, SYNC_SIZE + sizeof(data_length_t));
+        return true;
+    }
+    if (fifo_bytes_used(p_fifo) < (PROTOCOL_OVERHEAD + msg_length)) {
+        return false;
+    }
+    fifo_destroy(p_fifo, PROTOCOL_OVERHEAD);
+    uint8_t data_buffer[MAX_DATA_LENGTH];
+    fifo_get(p_fifo, data_buffer, msg_length);
+#if (CHECKSUM_SIZE > 0)
+    checksum_t checksum = 0;
+    for (i = SYNC_SIZE; i < (PROTOCOL_OVERHEAD - CHECKSUM_SIZE); i++) {
+        checksum += header[i];
+    }
+    for (i = 0; i < msg_length; i++) {
+        checksum += data_buffer[i];
+    }
+    checksum_t actual = (checksum_t) LEtoUint(header + SYNC_SIZE + sizeof(data_length_t) + sizeof(command_t) +
+            sizeof(handle_t), CHECKSUM_SIZE);
+    if (actual != checksum) {
+        return true;
+    }
+#endif
+
+#if (CRC_SIZE > 0)
+    crc_t calc_crc = crc32(header, SYNC_SIZE + sizeof(data_length_t) + sizeof(command_t) + CHECKSUM_SIZE, 0);
+    calc_crc = crc32(data_buffer, msg_length, calc_crc);
+    crc_t actual_crc = LEtoUint(
+            header + SYNC_SIZE + sizeof(data_length_t) + sizeof(command_t) + sizeof(handle_t) + CHECKSUM_SIZE,
+            CRC_SIZE);
+    if (calc_crc != actual_crc) {
+        return true;
+    }
+#endif
+    return true;
+}
