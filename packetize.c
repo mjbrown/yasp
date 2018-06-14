@@ -65,7 +65,9 @@ bool depacketize_data(fifo_t * p_fifo) {
     int i;
 #if (SYNC_SIZE > 0)
     while (fifo_bytes_used(p_fifo) >= PROTOCOL_OVERHEAD) {
-        if (LEtoUint(p_fifo->data, SYNC_SIZE) != SYNC_VALUE) {
+        uint8_t sync[SYNC_SIZE];
+        fifo_peek(p_fifo, sync, 0, 2);
+        if (LEtoUint(sync, SYNC_SIZE) != SYNC_VALUE) {
             fifo_destroy(p_fifo, 1);
         } else {
             break;
@@ -74,6 +76,7 @@ bool depacketize_data(fifo_t * p_fifo) {
 #endif
 
     if (fifo_bytes_used(p_fifo) < PROTOCOL_OVERHEAD) {
+        printf("Used (%d) < Overhead (%d)", fifo_bytes_used(p_fifo), PROTOCOL_OVERHEAD);
         return false;
     }
     uint8_t header[PROTOCOL_OVERHEAD];
@@ -81,9 +84,11 @@ bool depacketize_data(fifo_t * p_fifo) {
     data_length_t msg_length = (data_length_t )LEtoUint(header + SYNC_SIZE, sizeof(data_length_t));
     if (msg_length > MAX_DATA_LENGTH) {
         fifo_destroy(p_fifo, SYNC_SIZE + sizeof(data_length_t));
+        printf("Length out of bounds! %d", msg_length);
         return true;
     }
     if (fifo_bytes_used(p_fifo) < (PROTOCOL_OVERHEAD + msg_length)) {
+        printf("Used < Overhead + Length");
         return false;
     }
     handle_t handle = (handle_t) LEtoUint(header + SYNC_SIZE + sizeof(data_length_t), sizeof(handle_t));
