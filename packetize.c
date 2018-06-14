@@ -8,6 +8,20 @@
 
 #define PROTOCOL_OVERHEAD   (SYNC_SIZE + sizeof(data_length_t) + sizeof(handle_t) + sizeof(command_t) + CHECKSUM_SIZE + CRC_SIZE)
 
+typedef struct {
+    command_t cmd;
+    cmd_handler_t cmd_handler;
+} cmd_table_entry;
+
+static cmd_table_entry cmd_table[MAX_NUMBER_OF_CMDS];
+static uint32_t cmd_table_length = 0;
+
+void register_cmd_handler(command_t cmd, cmd_handler_t cmd_handler) {
+    cmd_table[cmd_table_length].cmd = cmd;
+    cmd_table[cmd_table_length].cmd_handler = cmd_handler;
+    cmd_table_length += 1;
+}
+
 void packetize_data(command_t cmd, handle_t cmd_handle, uint8_t * data, data_length_t length, fifo_t * p_fifo) {
 // Customize here for synchronization bytes, checksum, byte stuffing, etc.
     uint32_t i;
@@ -26,7 +40,7 @@ void packetize_data(command_t cmd, handle_t cmd_handle, uint8_t * data, data_len
 
 #if (CHECKSUM_SIZE > 0)
     checksum_t checksum = 0;
-    for (i = SYNC_SIZE; i < PROTOCOL_OVERHEAD - CHECKSUM_SIZE; i++) {
+    for (i = 0; i < (SYNC_SIZE + sizeof(data_length_t) + sizeof(command_t)); i++) {
         checksum += header[i];
     }
     for (i = 0; i < length; i++) {
@@ -72,12 +86,14 @@ bool depacketize_data(fifo_t * p_fifo) {
     if (fifo_bytes_used(p_fifo) < (PROTOCOL_OVERHEAD + msg_length)) {
         return false;
     }
+    handle_t handle = (handle_t) LEtoUint(header + SYNC_SIZE + sizeof(data_length_t), sizeof(handle_t));
+    command_t cmd = (command_t) LEtoUint(header + SYNC_SIZE + sizeof(data_length_t) + sizeof(handle_t), sizeof(command_t));
     fifo_destroy(p_fifo, PROTOCOL_OVERHEAD);
     uint8_t data_buffer[MAX_DATA_LENGTH];
     fifo_get(p_fifo, data_buffer, msg_length);
 #if (CHECKSUM_SIZE > 0)
     checksum_t checksum = 0;
-    for (i = SYNC_SIZE; i < (PROTOCOL_OVERHEAD - CHECKSUM_SIZE); i++) {
+    for (i = 0; i < (SYNC_SIZE + sizeof(data_length_t) + sizeof(command_t)); i++) {
         checksum += header[i];
     }
     for (i = 0; i < msg_length; i++) {
@@ -86,6 +102,7 @@ bool depacketize_data(fifo_t * p_fifo) {
     checksum_t actual = (checksum_t) LEtoUint(header + SYNC_SIZE + sizeof(data_length_t) + sizeof(command_t) +
             sizeof(handle_t), CHECKSUM_SIZE);
     if (actual != checksum) {
+        printf("CHECKSUM FAILED %d(actual) != %d(received)!\n", actual, checksum);
         return true;
     }
 #endif
@@ -97,8 +114,16 @@ bool depacketize_data(fifo_t * p_fifo) {
             header + SYNC_SIZE + sizeof(data_length_t) + sizeof(command_t) + sizeof(handle_t) + CHECKSUM_SIZE,
             CRC_SIZE);
     if (calc_crc != actual_crc) {
+        printf("CRC FAILED!\n");
         return true;
     }
 #endif
+    for (i = 0; i < cmd_table_length; i++) {
+        if (cmd_table[i].cmd == cmd) {
+            cmd_table[i].cmd_handler(cmd, handle, data_buffer, msg_length);
+            return true;
+        }
+    }
+    printf("COMMAND %d NOT FOUND!\n", cmd);
     return true;
 }

@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-// TODO: Change based upon desired synchronization sequence
+// TODO: Change based upon expected sync size
 typedef uint16_t sync_t;
 // TODO: Change based upon expected message size
 typedef uint16_t data_length_t;
@@ -22,7 +22,9 @@ typedef uint32_t crc_t;
 // TODO: Set these parameters based upon your protocol specification
 #define SYNC_VALUE          0xAA55
 #define MAX_DATA_LENGTH     1024
+#define MAX_NUMBER_OF_CMDS  100
 
+#define MAX_PROTOCOL_OVERHEAD     (sizeof(sync_t) + sizeof(data_length_t) + sizeof(command_t) + sizeof(handle_t) + sizeof(checksum_t) + sizeof(crc_t))
 
 typedef enum
 {
@@ -36,10 +38,12 @@ typedef enum
     RET_AUTO_ACK=0x07
 } RET_CODE_E;
 
+typedef RET_CODE_E (* cmd_handler_t) (command_t cmd, handle_t handle, uint8_t * payload, data_length_t length);
+
 void packetize_data(command_t cmd, handle_t cmd_handle, uint8_t * data, data_length_t length, fifo_t * p_fifo);
 
-bool unpacketize_data(fifo_t * p_fifo, uint8_t * data, uint16_t length);
+bool depacketize_data(fifo_t * p_fifo);
 
-void packetize_init(void);
+void register_cmd_handler(command_t cmd, cmd_handler_t cmd_handler);
 
 #endif //YASP_PACKETIZE_H

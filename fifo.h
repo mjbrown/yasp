@@ -24,4 +24,6 @@ void fifo_peek( fifo_t *fifo, uint8_t *dest, uint32_t offset, uint32_t size );
 
 void fifo_destroy( fifo_t *fifo, uint32_t size );
 
+void print_fifo_info(fifo_t * fifo);
+
 #endif //YASP_FIFO_H
