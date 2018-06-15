@@ -41,13 +41,13 @@ void test_extra_bytes(int repetitions) {
     }
 }
 
-#define TEST_REPETITIONS    100
+#define TEST_REPETITIONS    5
 
 int main() {
     crc_init();
     register_cmd_handler(LOOPBACK_CMD, cmd_loopback_handler);
     register_cmd_handler(ERROR_CMD, cmd_error_handler);
-    test_loopback(TEST_REPETITIONS);
+    //test_loopback(TEST_REPETITIONS);
     test_extra_bytes(TEST_REPETITIONS);
     return 0;
 }

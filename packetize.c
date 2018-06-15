@@ -63,13 +63,18 @@ void packetize_data(command_t cmd, handle_t cmd_handle, uint8_t * data, data_len
 
 bool depacketize_data(fifo_t * rx_fifo, fifo_t * err_fifo) {
 #if (SYNC_SIZE > 0)
+    static bool sync_ok = true;
     while (fifo_bytes_used(rx_fifo) >= PROTOCOL_OVERHEAD) {
         uint8_t sync[SYNC_SIZE];
         fifo_peek(rx_fifo, sync, 0, 2);
         if (LEtoUint(sync, SYNC_SIZE) != SYNC_VALUE) {
             fifo_destroy(rx_fifo, 1);
-            error_msg((uint8_t *)"SYNC", sizeof("SYNC"), err_fifo);
+            if (sync_ok) {
+                error_msg((uint8_t *)"SYNC", sizeof("SYNC"), err_fifo);
+            }
+            sync_ok = false;
         } else {
+            sync_ok = true;
             break;
         }
     }
@@ -83,7 +88,6 @@ bool depacketize_data(fifo_t * rx_fifo, fifo_t * err_fifo) {
     data_length_t msg_length = (data_length_t )LEtoUint(header + SYNC_SIZE, sizeof(data_length_t));
     if (msg_length > MAX_DATA_LENGTH) {
         fifo_destroy(rx_fifo, SYNC_SIZE + sizeof(data_length_t));
-        printf("Length out of bounds! %d", msg_length);
 #ifdef YASP_ERROR_H
         if (err_fifo != NULL)
             error_msg((uint8_t *)"MAX DATA LENGTH", sizeof("MAX DATA LENGTH"), err_fifo);
@@ -91,7 +95,6 @@ bool depacketize_data(fifo_t * rx_fifo, fifo_t * err_fifo) {
         return true;
     }
     if (fifo_bytes_used(rx_fifo) < (PROTOCOL_OVERHEAD + msg_length)) {
-        printf("Used < Overhead + Length");
         return false;
     }
     handle_t handle = (handle_t) LEtoUint(header + SYNC_SIZE + sizeof(data_length_t), sizeof(handle_t));
@@ -110,7 +113,6 @@ bool depacketize_data(fifo_t * rx_fifo, fifo_t * err_fifo) {
     checksum_t actual = (checksum_t) LEtoUint(header + SYNC_SIZE + sizeof(data_length_t) + sizeof(command_t) +
             sizeof(handle_t), CHECKSUM_SIZE);
     if (actual != checksum) {
-        printf("CHECKSUM FAILED %d(actual) != %d(received)!\n", actual, checksum);
 #ifdef YASP_ERROR_H
         if (err_fifo != NULL)
             error_msg((uint8_t *)"CHECKSUM FAIL", sizeof("CHECKSUM FAIL"), err_fifo);
@@ -124,7 +126,6 @@ bool depacketize_data(fifo_t * rx_fifo, fifo_t * err_fifo) {
     calc_crc = crc16(data_buffer, msg_length, calc_crc);
     crc_t actual_crc = (crc_t) LEtoUint(header + SYNC_SIZE + sizeof(data_length_t) + sizeof(command_t) + sizeof(handle_t) + CHECKSUM_SIZE, CRC_SIZE);
     if (calc_crc != actual_crc) {
-        printf("CRC FAILED!\n");
 #ifdef YASP_ERROR_H
         if (err_fifo != NULL)
             error_msg((uint8_t *)"CRC FAIL", sizeof("CRC FAIL"), err_fifo);
@@ -147,6 +148,5 @@ bool depacketize_data(fifo_t * rx_fifo, fifo_t * err_fifo) {
     if (err_fifo != NULL)
         error_msg((uint8_t *)"COMMAND NOT FOUND", sizeof("COMMAND NOT FOUND"), err_fifo);
 #endif
-    printf("COMMAND %d NOT FOUND!\n", cmd);
     return true;
 }
