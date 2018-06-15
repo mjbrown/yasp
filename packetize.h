@@ -15,8 +15,6 @@ typedef uint8_t command_t;
 typedef uint8_t handle_t;
 // TODO: Change based upon desired checksum size
 typedef uint16_t checksum_t;
-// TODO: Change based upon desired CRC size
-typedef uint32_t crc_t;
 
 
 // TODO: Set these parameters based upon your protocol specification

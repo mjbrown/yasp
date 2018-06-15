@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "packetize.h"
+#include "util.h"
 
 uint8_t tx_buffer[MAX_PROTOCOL_OVERHEAD + MAX_DATA_LENGTH + 1];
 static fifo_t serial_tx = {0, 0, tx_buffer, sizeof(tx_buffer)};
@@ -20,6 +21,7 @@ void loopback(uint8_t * payload, data_length_t length) {
 }
 
 int main() {
+    crc_init();
     uint8_t fake_data[MAX_DATA_LENGTH];
     for (uint32_t i = 0; i < sizeof(fake_data); i++) {
         fake_data[i] = (uint8_t) i;
@@ -35,6 +37,5 @@ int main() {
             }
         }
     }
-    loopback(fake_data, sizeof(fake_data));
     return 0;
 }

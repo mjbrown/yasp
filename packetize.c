@@ -4,7 +4,7 @@
 // TODO: Set a size to zero to eliminate the field
 #define SYNC_SIZE           2
 #define CHECKSUM_SIZE       2
-#define CRC_SIZE            4
+#define CRC_SIZE            2
 
 #define PROTOCOL_OVERHEAD   (SYNC_SIZE + sizeof(data_length_t) + sizeof(handle_t) + sizeof(command_t) + CHECKSUM_SIZE + CRC_SIZE)
 
@@ -51,9 +51,8 @@ void packetize_data(command_t cmd, handle_t cmd_handle, uint8_t * data, data_len
 #endif
 
 #if (CRC_SIZE > 0)
-    crc_t crc = crc32(header, SYNC_SIZE + sizeof(data_length_t) + sizeof(command_t) + CHECKSUM_SIZE, 0);
-    toUintLEArray(crc32(data, length, crc), p_header, CRC_SIZE);
-    p_header += CRC_SIZE;
+    crc_t crc = crc16(header, SYNC_SIZE + sizeof(data_length_t) + sizeof(command_t) + CHECKSUM_SIZE, 0);
+    toUintLEArray(crc16(data, length, crc), p_header, CRC_SIZE);
 #endif
 
     fifo_put(p_fifo, header, PROTOCOL_OVERHEAD);
@@ -113,11 +112,9 @@ bool depacketize_data(fifo_t * p_fifo) {
 #endif
 
 #if (CRC_SIZE > 0)
-    crc_t calc_crc = crc32(header, SYNC_SIZE + sizeof(data_length_t) + sizeof(command_t) + CHECKSUM_SIZE, 0);
-    calc_crc = crc32(data_buffer, msg_length, calc_crc);
-    crc_t actual_crc = LEtoUint(
-            header + SYNC_SIZE + sizeof(data_length_t) + sizeof(command_t) + sizeof(handle_t) + CHECKSUM_SIZE,
-            CRC_SIZE);
+    crc_t calc_crc = crc16(header, SYNC_SIZE + sizeof(data_length_t) + sizeof(command_t) + CHECKSUM_SIZE, 0);
+    calc_crc = crc16(data_buffer, msg_length, calc_crc);
+    crc_t actual_crc = (crc_t) LEtoUint(header + SYNC_SIZE + sizeof(data_length_t) + sizeof(command_t) + sizeof(handle_t) + CHECKSUM_SIZE, CRC_SIZE);
     if (calc_crc != actual_crc) {
         printf("CRC FAILED!\n");
         return true;
