@@ -40,7 +40,7 @@ typedef RET_CODE_E (* cmd_handler_t) (command_t cmd, handle_t handle, uint8_t * 
 
 void packetize_data(command_t cmd, handle_t cmd_handle, uint8_t * data, data_length_t length, fifo_t * p_fifo);
 
-bool depacketize_data(fifo_t * p_fifo);
+bool depacketize_data(fifo_t * rx_fifo, fifo_t * err_fifo);
 
 void register_cmd_handler(command_t cmd, cmd_handler_t cmd_handler);
 

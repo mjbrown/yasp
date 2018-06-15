@@ -1,6 +1,9 @@
 #include "util.h"
 #include "packetize.h"
 
+// TODO: Remove this include if you do not want error messages
+#include "error.h"
+
 // TODO: Set a size to zero to eliminate the field
 #define SYNC_SIZE           2
 #define CHECKSUM_SIZE       2
@@ -23,8 +26,6 @@ void register_cmd_handler(command_t cmd, cmd_handler_t cmd_handler) {
 }
 
 void packetize_data(command_t cmd, handle_t cmd_handle, uint8_t * data, data_length_t length, fifo_t * p_fifo) {
-// Customize here for synchronization bytes, checksum, byte stuffing, etc.
-    uint32_t i;
     uint8_t header[PROTOCOL_OVERHEAD];
     uint8_t * p_header = header;
 #if (SYNC_SIZE > 0)
@@ -40,10 +41,10 @@ void packetize_data(command_t cmd, handle_t cmd_handle, uint8_t * data, data_len
 
 #if (CHECKSUM_SIZE > 0)
     checksum_t checksum = 0;
-    for (i = 0; i < (SYNC_SIZE + sizeof(data_length_t) + sizeof(command_t)); i++) {
+    for (uint32_t i = 0; i < (SYNC_SIZE + sizeof(data_length_t) + sizeof(command_t)); i++) {
         checksum += header[i];
     }
-    for (i = 0; i < length; i++) {
+    for (uint32_t i = 0; i < length; i++) {
         checksum += data[i];
     }
     toUintLEArray( checksum, p_header, CHECKSUM_SIZE);
@@ -60,53 +61,60 @@ void packetize_data(command_t cmd, handle_t cmd_handle, uint8_t * data, data_len
 }
 
 
-bool depacketize_data(fifo_t * p_fifo) {
-    int i;
+bool depacketize_data(fifo_t * rx_fifo, fifo_t * err_fifo) {
 #if (SYNC_SIZE > 0)
-    while (fifo_bytes_used(p_fifo) >= PROTOCOL_OVERHEAD) {
+    while (fifo_bytes_used(rx_fifo) >= PROTOCOL_OVERHEAD) {
         uint8_t sync[SYNC_SIZE];
-        fifo_peek(p_fifo, sync, 0, 2);
+        fifo_peek(rx_fifo, sync, 0, 2);
         if (LEtoUint(sync, SYNC_SIZE) != SYNC_VALUE) {
-            fifo_destroy(p_fifo, 1);
+            fifo_destroy(rx_fifo, 1);
+            error_msg((uint8_t *)"SYNC", sizeof("SYNC"), err_fifo);
         } else {
             break;
         }
     }
 #endif
 
-    if (fifo_bytes_used(p_fifo) < PROTOCOL_OVERHEAD) {
-        printf("Used (%d) < Overhead (%d)", fifo_bytes_used(p_fifo), PROTOCOL_OVERHEAD);
+    if (fifo_bytes_used(rx_fifo) < PROTOCOL_OVERHEAD) {
         return false;
     }
     uint8_t header[PROTOCOL_OVERHEAD];
-    fifo_peek(p_fifo, header, 0, PROTOCOL_OVERHEAD);
+    fifo_peek(rx_fifo, header, 0, PROTOCOL_OVERHEAD);
     data_length_t msg_length = (data_length_t )LEtoUint(header + SYNC_SIZE, sizeof(data_length_t));
     if (msg_length > MAX_DATA_LENGTH) {
-        fifo_destroy(p_fifo, SYNC_SIZE + sizeof(data_length_t));
+        fifo_destroy(rx_fifo, SYNC_SIZE + sizeof(data_length_t));
         printf("Length out of bounds! %d", msg_length);
+#ifdef YASP_ERROR_H
+        if (err_fifo != NULL)
+            error_msg((uint8_t *)"MAX DATA LENGTH", sizeof("MAX DATA LENGTH"), err_fifo);
+#endif
         return true;
     }
-    if (fifo_bytes_used(p_fifo) < (PROTOCOL_OVERHEAD + msg_length)) {
+    if (fifo_bytes_used(rx_fifo) < (PROTOCOL_OVERHEAD + msg_length)) {
         printf("Used < Overhead + Length");
         return false;
     }
     handle_t handle = (handle_t) LEtoUint(header + SYNC_SIZE + sizeof(data_length_t), sizeof(handle_t));
     command_t cmd = (command_t) LEtoUint(header + SYNC_SIZE + sizeof(data_length_t) + sizeof(handle_t), sizeof(command_t));
-    fifo_destroy(p_fifo, PROTOCOL_OVERHEAD);
+    fifo_destroy(rx_fifo, PROTOCOL_OVERHEAD);
     uint8_t data_buffer[MAX_DATA_LENGTH];
-    fifo_get(p_fifo, data_buffer, msg_length);
+    fifo_get(rx_fifo, data_buffer, msg_length);
 #if (CHECKSUM_SIZE > 0)
     checksum_t checksum = 0;
-    for (i = 0; i < (SYNC_SIZE + sizeof(data_length_t) + sizeof(command_t)); i++) {
+    for (uint32_t i = 0; i < (SYNC_SIZE + sizeof(data_length_t) + sizeof(command_t)); i++) {
         checksum += header[i];
     }
-    for (i = 0; i < msg_length; i++) {
+    for (uint32_t i = 0; i < msg_length; i++) {
         checksum += data_buffer[i];
     }
     checksum_t actual = (checksum_t) LEtoUint(header + SYNC_SIZE + sizeof(data_length_t) + sizeof(command_t) +
             sizeof(handle_t), CHECKSUM_SIZE);
     if (actual != checksum) {
         printf("CHECKSUM FAILED %d(actual) != %d(received)!\n", actual, checksum);
+#ifdef YASP_ERROR_H
+        if (err_fifo != NULL)
+            error_msg((uint8_t *)"CHECKSUM FAIL", sizeof("CHECKSUM FAIL"), err_fifo);
+#endif
         return true;
     }
 #endif
@@ -117,15 +125,28 @@ bool depacketize_data(fifo_t * p_fifo) {
     crc_t actual_crc = (crc_t) LEtoUint(header + SYNC_SIZE + sizeof(data_length_t) + sizeof(command_t) + sizeof(handle_t) + CHECKSUM_SIZE, CRC_SIZE);
     if (calc_crc != actual_crc) {
         printf("CRC FAILED!\n");
+#ifdef YASP_ERROR_H
+        if (err_fifo != NULL)
+            error_msg((uint8_t *)"CRC FAIL", sizeof("CRC FAIL"), err_fifo);
+#endif
         return true;
     }
 #endif
-    for (i = 0; i < cmd_table_length; i++) {
+    for (uint32_t i = 0; i < cmd_table_length; i++) {
         if (cmd_table[i].cmd == cmd) {
-            cmd_table[i].cmd_handler(cmd, handle, data_buffer, msg_length);
+            if (cmd_table[i].cmd_handler(cmd, handle, data_buffer, msg_length) != RET_OK) {
+#ifdef YASP_ERROR_H
+                if (err_fifo != NULL)
+                    error_msg((uint8_t *)"COMMAND FAIL", sizeof("COMMAND FAIL"), err_fifo);
+#endif
+            }
             return true;
         }
     }
+#ifdef YASP_ERROR_H
+    if (err_fifo != NULL)
+        error_msg((uint8_t *)"COMMAND NOT FOUND", sizeof("COMMAND NOT FOUND"), err_fifo);
+#endif
     printf("COMMAND %d NOT FOUND!\n", cmd);
     return true;
 }
