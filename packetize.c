@@ -72,7 +72,7 @@ void packetize_data(command_t cmd, handle_t cmd_handle, payload_section_t * payl
 }
 
 
-bool depacketize_data(fifo_t * rx_fifo, fifo_t * err_fifo) {
+bool depacketize_data(fifo_t * rx_fifo, fifo_t * resp_fifo) {
 #if (SYNC_SIZE > 0)
     static bool sync_ok = true;
     while (fifo_bytes_used(rx_fifo) >= PROTOCOL_OVERHEAD) {
@@ -81,7 +81,7 @@ bool depacketize_data(fifo_t * rx_fifo, fifo_t * err_fifo) {
         if (LEtoUint(sync, SYNC_SIZE) != SYNC_VALUE) {
             fifo_destroy(rx_fifo, 1);
             if (sync_ok) {
-                error_msg((uint8_t *)"SYNC", sizeof("SYNC"), err_fifo);
+                error_msg((uint8_t *)"SYNC", sizeof("SYNC"), resp_fifo);
             }
             sync_ok = false;
         } else {
@@ -100,8 +100,8 @@ bool depacketize_data(fifo_t * rx_fifo, fifo_t * err_fifo) {
     if (msg_length > MAX_DATA_LENGTH) {
         fifo_destroy(rx_fifo, SYNC_SIZE + sizeof(data_length_t));
 #ifdef YASP_ERROR_H
-        if (err_fifo != NULL)
-            error_msg((uint8_t *)"MAX DATA LENGTH", sizeof("MAX DATA LENGTH"), err_fifo);
+        if (resp_fifo != NULL)
+            error_msg((uint8_t *)"MAX DATA LENGTH", sizeof("MAX DATA LENGTH"), resp_fifo);
 #endif
         return true;
     }
@@ -125,8 +125,8 @@ bool depacketize_data(fifo_t * rx_fifo, fifo_t * err_fifo) {
             sizeof(handle_t), CHECKSUM_SIZE);
     if (actual != checksum) {
 #ifdef YASP_ERROR_H
-        if (err_fifo != NULL) {
-            error_msg((uint8_t *) "CHECKSUM FAIL", sizeof("CHECKSUM FAIL"), err_fifo);
+        if (resp_fifo != NULL) {
+            error_msg((uint8_t *) "CHECKSUM FAIL", sizeof("CHECKSUM FAIL"), resp_fifo);
         }
 #endif
         return true;
@@ -139,8 +139,8 @@ bool depacketize_data(fifo_t * rx_fifo, fifo_t * err_fifo) {
     crc_t actual_crc = (crc_t) LEtoUint(header + SYNC_SIZE + sizeof(data_length_t) + sizeof(command_t) + sizeof(handle_t) + CHECKSUM_SIZE, CRC_SIZE);
     if (calc_crc != actual_crc) {
 #ifdef YASP_ERROR_H
-        if (err_fifo != NULL) {
-            error_msg((uint8_t *) "CRC FAIL", sizeof("CRC FAIL"), err_fifo);
+        if (resp_fifo != NULL) {
+            error_msg((uint8_t *) "CRC FAIL", sizeof("CRC FAIL"), resp_fifo);
         }
 #endif
         return true;
@@ -148,10 +148,10 @@ bool depacketize_data(fifo_t * rx_fifo, fifo_t * err_fifo) {
 #endif
     for (uint32_t i = 0; i < cmd_table_length; i++) {
         if (cmd_table[i].cmd == cmd) {
-            if (cmd_table[i].cmd_handler(cmd, handle, data_buffer, msg_length) != RET_OK) {
+            if (cmd_table[i].cmd_handler(cmd, handle, data_buffer, msg_length, resp_fifo) != RET_OK) {
 #ifdef YASP_ERROR_H
-                if (err_fifo != NULL) {
-                    error_msg((uint8_t *) "COMMAND FAIL", sizeof("COMMAND FAIL"), err_fifo);
+                if (resp_fifo != NULL) {
+                    error_msg((uint8_t *) "COMMAND FAIL", sizeof("COMMAND FAIL"), resp_fifo);
                 }
 #endif
             }
@@ -159,8 +159,8 @@ bool depacketize_data(fifo_t * rx_fifo, fifo_t * err_fifo) {
         }
     }
 #ifdef YASP_ERROR_H
-    if (err_fifo != NULL) {
-        error_msg((uint8_t *) "COMMAND NOT FOUND", sizeof("COMMAND NOT FOUND"), err_fifo);
+    if (resp_fifo != NULL) {
+        error_msg((uint8_t *) "COMMAND NOT FOUND", sizeof("COMMAND NOT FOUND"), resp_fifo);
     }
 #endif
     return true;

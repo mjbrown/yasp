@@ -42,7 +42,7 @@ typedef struct
     data_length_t length;
 } payload_section_t;
 
-typedef RET_CODE_E (* cmd_handler_t) (command_t cmd, handle_t handle, uint8_t * payload, data_length_t length);
+typedef RET_CODE_E (* cmd_handler_t) (command_t cmd, handle_t handle, uint8_t * payload, data_length_t length, fifo_t * resp_fifo);
 
 void packetize_data(command_t cmd, handle_t cmd_handle, payload_section_t * payloads, uint16_t num_payloads, fifo_t * p_fifo);
 

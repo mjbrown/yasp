@@ -61,7 +61,7 @@ void fifo_destroy( fifo_t *fifo, uint32_t size )
 {
     fifo->start = ( fifo->start + size ) % fifo->size;
 }
-
+/*
 void print_fifo_info(fifo_t * fifo) {
     printf("FIFO Size: %d, Start: %d, End: %d, Used: %d\nContents: ", fifo->size, fifo->start, fifo->end, fifo_bytes_used(fifo));
     for (uint32_t i = 0; i < fifo_bytes_used(fifo); i++) {
@@ -71,3 +71,4 @@ void print_fifo_info(fifo_t * fifo) {
     }
     printf("\n");
 }
+*/
