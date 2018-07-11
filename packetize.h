@@ -36,9 +36,15 @@ typedef enum
     RET_AUTO_ACK=0x07
 } RET_CODE_E;
 
+typedef struct
+{
+    uint8_t * data;
+    data_length_t length;
+} payload_section_t;
+
 typedef RET_CODE_E (* cmd_handler_t) (command_t cmd, handle_t handle, uint8_t * payload, data_length_t length);
 
-void packetize_data(command_t cmd, handle_t cmd_handle, uint8_t * data, data_length_t length, fifo_t * p_fifo);
+void packetize_data(command_t cmd, handle_t cmd_handle, payload_section_t * payloads, uint16_t num_payloads, fifo_t * p_fifo);
 
 bool depacketize_data(fifo_t * rx_fifo, fifo_t * err_fifo);
 

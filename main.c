@@ -26,6 +26,23 @@ void test_loopback(int repetitions) {
     }
 }
 
+void test_multi_section_loopback(int repetitions) {
+    uint8_t fake_data[MAX_DATA_LENGTH];
+    for (uint32_t i = 0; i < sizeof(fake_data); i++) {
+        fake_data[i] = (uint8_t) i;
+    }
+    for (uint16_t i = 16; i < MAX_DATA_LENGTH; i++) {
+        printf("Packet Length under test: %d\n", i);
+        for (uint32_t j = 0; j < repetitions; j++) {
+            multi_section_loopback(4, fake_data, i, &serial_tx);
+            if (!depacketize_data(&serial_tx, &serial_rx)) {
+                printf("Error %d, %d!\n", i, j);
+                exit(1);
+            }
+        }
+    }
+}
+
 void test_extra_bytes(int repetitions) {
     uint8_t fake_data[4];
     for (uint32_t i = 0; i < repetitions; i++) {
@@ -41,13 +58,14 @@ void test_extra_bytes(int repetitions) {
     }
 }
 
-#define TEST_REPETITIONS    5
+#define TEST_REPETITIONS    500
 
 int main() {
     crc_init();
     register_cmd_handler(LOOPBACK_CMD, cmd_loopback_handler);
     register_cmd_handler(ERROR_CMD, cmd_error_handler);
     //test_loopback(TEST_REPETITIONS);
-    test_extra_bytes(TEST_REPETITIONS);
+    test_multi_section_loopback(TEST_REPETITIONS);
+    //test_extra_bytes(TEST_REPETITIONS);
     return 0;
 }

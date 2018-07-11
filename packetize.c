@@ -25,13 +25,17 @@ void register_cmd_handler(command_t cmd, cmd_handler_t cmd_handler) {
     cmd_table_length += 1;
 }
 
-void packetize_data(command_t cmd, handle_t cmd_handle, uint8_t * data, data_length_t length, fifo_t * p_fifo) {
+void packetize_data(command_t cmd, handle_t cmd_handle, payload_section_t * payloads, uint16_t num_payloads, fifo_t * p_fifo) {
     uint8_t header[PROTOCOL_OVERHEAD];
     uint8_t * p_header = header;
 #if (SYNC_SIZE > 0)
     toUintLEArray( SYNC_VALUE, p_header, SYNC_SIZE);
     p_header += SYNC_SIZE;
 #endif
+    data_length_t length = 0;
+    for (uint16_t i = 0; i < num_payloads; i++) {
+        length += payloads[i].length;
+    }
     toUintLEArray( length, p_header, sizeof(data_length_t));
     p_header += sizeof(data_length_t);
     toUintLEArray( cmd_handle, p_header, sizeof(handle_t));
@@ -44,8 +48,10 @@ void packetize_data(command_t cmd, handle_t cmd_handle, uint8_t * data, data_len
     for (uint32_t i = 0; i < (SYNC_SIZE + sizeof(data_length_t) + sizeof(command_t)); i++) {
         checksum += header[i];
     }
-    for (uint32_t i = 0; i < length; i++) {
-        checksum += data[i];
+    for (uint16_t i = 0; i < num_payloads; i++) {
+        for (data_length_t j = 0; j < payloads[i].length; j++) {
+            checksum += payloads[i].data[j];
+        }
     }
     toUintLEArray( checksum, p_header, CHECKSUM_SIZE);
     p_header += CHECKSUM_SIZE;
@@ -53,11 +59,16 @@ void packetize_data(command_t cmd, handle_t cmd_handle, uint8_t * data, data_len
 
 #if (CRC_SIZE > 0)
     crc_t crc = crc16(header, SYNC_SIZE + sizeof(data_length_t) + sizeof(command_t) + CHECKSUM_SIZE, 0);
-    toUintLEArray(crc16(data, length, crc), p_header, CRC_SIZE);
+    for (uint16_t i = 0; i < num_payloads; i++) {
+        crc = crc16(payloads[i].data, payloads[i].length, crc);
+    }
+    toUintLEArray(crc, p_header, CRC_SIZE);
 #endif
 
     fifo_put(p_fifo, header, PROTOCOL_OVERHEAD);
-    fifo_put(p_fifo, data, length);
+    for (uint16_t i = 0; i < num_payloads; i++) {
+        fifo_put(p_fifo, payloads[i].data, payloads[i].length);
+    }
 }
 
 
@@ -114,8 +125,9 @@ bool depacketize_data(fifo_t * rx_fifo, fifo_t * err_fifo) {
             sizeof(handle_t), CHECKSUM_SIZE);
     if (actual != checksum) {
 #ifdef YASP_ERROR_H
-        if (err_fifo != NULL)
-            error_msg((uint8_t *)"CHECKSUM FAIL", sizeof("CHECKSUM FAIL"), err_fifo);
+        if (err_fifo != NULL) {
+            error_msg((uint8_t *) "CHECKSUM FAIL", sizeof("CHECKSUM FAIL"), err_fifo);
+        }
 #endif
         return true;
     }
@@ -127,8 +139,9 @@ bool depacketize_data(fifo_t * rx_fifo, fifo_t * err_fifo) {
     crc_t actual_crc = (crc_t) LEtoUint(header + SYNC_SIZE + sizeof(data_length_t) + sizeof(command_t) + sizeof(handle_t) + CHECKSUM_SIZE, CRC_SIZE);
     if (calc_crc != actual_crc) {
 #ifdef YASP_ERROR_H
-        if (err_fifo != NULL)
-            error_msg((uint8_t *)"CRC FAIL", sizeof("CRC FAIL"), err_fifo);
+        if (err_fifo != NULL) {
+            error_msg((uint8_t *) "CRC FAIL", sizeof("CRC FAIL"), err_fifo);
+        }
 #endif
         return true;
     }
@@ -137,16 +150,18 @@ bool depacketize_data(fifo_t * rx_fifo, fifo_t * err_fifo) {
         if (cmd_table[i].cmd == cmd) {
             if (cmd_table[i].cmd_handler(cmd, handle, data_buffer, msg_length) != RET_OK) {
 #ifdef YASP_ERROR_H
-                if (err_fifo != NULL)
-                    error_msg((uint8_t *)"COMMAND FAIL", sizeof("COMMAND FAIL"), err_fifo);
+                if (err_fifo != NULL) {
+                    error_msg((uint8_t *) "COMMAND FAIL", sizeof("COMMAND FAIL"), err_fifo);
+                }
 #endif
             }
             return true;
         }
     }
 #ifdef YASP_ERROR_H
-    if (err_fifo != NULL)
-        error_msg((uint8_t *)"COMMAND NOT FOUND", sizeof("COMMAND NOT FOUND"), err_fifo);
+    if (err_fifo != NULL) {
+        error_msg((uint8_t *) "COMMAND NOT FOUND", sizeof("COMMAND NOT FOUND"), err_fifo);
+    }
 #endif
     return true;
 }
