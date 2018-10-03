@@ -1,0 +1,5 @@
+nRF5_SDK/
+*.emsession
+bootloader/Output/
+application/Output/
+*.jlink
