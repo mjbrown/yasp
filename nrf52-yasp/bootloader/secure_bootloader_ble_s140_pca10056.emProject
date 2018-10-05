@@ -145,9 +145,7 @@
       <file file_name="../nRF5_SDK/components/libraries/crypto/backend/oberon/oberon_backend_hash.c" />
       <file file_name="../nRF5_SDK/components/libraries/crypto/backend/oberon/oberon_backend_hmac.c" />
     </folder>
-    <configuration
-      Name="Debug"
-      c_preprocessor_definitions="NRF_DFU_DEBUG_VERSION" />
+    <configuration Name="Debug" c_preprocessor_definitions="" />
   </project>
   <configuration
     Name="Release"
@@ -155,6 +153,6 @@
     gcc_optimization_level="Optimize For Size" />
   <configuration
     Name="Debug"
-    c_preprocessor_definitions="NRF_DFU_DEBUG_VERSION"
+    c_preprocessor_definitions=""
     gcc_optimization_level="Optimize For Size" />
 </solution>
