@@ -62,7 +62,9 @@ public class ScanFragment extends YaspFragment {
         listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                yaspService.stopScan();
                 yaspService.connectDevice(yaspService.getScanResults().get(position));
+                yaspFragmentListener.changeTab(ConnectedFragment.TAG);
             }
         });
         Activity activity = getActivity();

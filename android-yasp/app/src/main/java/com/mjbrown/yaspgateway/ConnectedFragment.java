@@ -17,7 +17,7 @@ import android.widget.ListView;
 import android.widget.TextView;
 
 public class ConnectedFragment extends YaspFragment {
-    public final String TAG = "ConnectedFragment";
+    public static String TAG = "ConnectedFragment";
     ListView listView;
     ConnectedListAdapter connectedListAdapter;
 

@@ -22,13 +22,26 @@ import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements YaspFragment.YaspFragmentListener {
     final static String TAG = "MainActivity";
     final static int REQUEST_ENABLE_BT_INTENT = 1;
     YaspService yaspService = null;
 
-    public interface MainActivityListener {
-        void changeTab(String tag);
+    @Override
+    public void changeTab(String fragmentTag) {
+        TabLayout.Tab tab = null;
+        if (fragmentTag.equals(ScanFragment.TAG)) {
+            tab = tabLayout.getTabAt(0);
+        } else if (fragmentTag.equals(ConnectedFragment.TAG)) {
+            tab = tabLayout.getTabAt(1);
+        } else if (fragmentTag.equals(SettingsFragment.TAG)) {
+            tab = tabLayout.getTabAt(2);
+        }
+        if (tab != null) {
+            tab.select();
+        } else {
+            Log.e(TAG, String.format("Incorrect tab name in changeTab(%s)!", fragmentTag));
+        }
     }
 
     private SectionsPagerAdapter sectionsPagerAdapter;

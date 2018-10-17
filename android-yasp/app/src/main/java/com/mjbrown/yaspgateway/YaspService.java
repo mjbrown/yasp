@@ -51,8 +51,17 @@ public class YaspService extends Service implements YaspDevice.YaspCallback{
     public List<YaspDevice> getYaspDevices() { return yaspDevices; }
 
     public void connectDevice(YaspScanResult scanResult) {
-        YaspDevice yaspDevice = new YaspDevice(scanResult.getBluetoothDevice());
-        yaspDevices.add(yaspDevice);
+        YaspDevice yaspDevice;
+        found: {
+            for (YaspDevice device: yaspDevices) {
+                if (device.getAddress().equals(scanResult.getBluetoothDevice().getAddress())) {
+                    yaspDevice = device;
+                    break found;
+                }
+            }
+            yaspDevice = new YaspDevice(scanResult.getBluetoothDevice());
+            yaspDevices.add(yaspDevice);
+        }
         yaspScanResults.remove(scanResult);
         Intent intent = new Intent();
         intent.setAction(ACTION_SCAN_EVENT);
