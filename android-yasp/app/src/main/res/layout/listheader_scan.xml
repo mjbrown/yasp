@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal">
+    <include
+        layout="@layout/linearlayout_device_name_address"
+        android:layout_width="0dp"
+        android:layout_weight="1"
+        android:layout_height="wrap_content" />
+    <TextView
+        android:id="@+id/textview_scan_rssi"
+        android:drawableTop="@drawable/ic_network_cell_black_32dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/test_device_rssi"
+        android:textSize="@dimen/small_text"
+        android:textAlignment="center" />
+    <View
+        android:layout_width="6dp"
+        android:layout_height="1dp" />
+<!--
+    <TextView
+        android:id="@+id/textview_scan_battery_level"
+        android:drawableTop="@drawable/ic_battery_unknown_black_32dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/test_device_battery_level"
+        android:textSize="@dimen/small_text"
+        android:textAlignment="center"/>
+    <View
+        android:layout_width="6dp"
+        android:layout_height="1dp" />
+-->
+</LinearLayout>
